@@ -1009,23 +1009,17 @@ class Anime:
             root_name = 'movie' if self.get_episode() == '電影' else 'tvshow'
             field: dict = {'thumb': self.get_thumbnail(), 'sn_id': self._sn,
                            'title': self.get_bangumi_name()}
+            data: dict = self._src
+            if not self._settings['use_mobile_api']:
+                data = self.__request_json(
+                    f'https://api.gamer.com.tw/mobile_app/anime/v2/video.php?sn={self._sn}',
+                    no_cookies=True)
 
-            if self._settings['use_mobile_api']:
-                date: str = self._src['data']['anime']['season_start']
-                field['year'] = date.split('/')[0]
-                field['premiered'] = date.replace('/', '-')
-                field['plot'] = self._src['data']['anime']['content']
-            else:
-                soup = self._src
-                try:
-                    date = soup.find('ul', 'type-list').li.p.text
-                    field['year'] = date.split('/')[0]
-                    field['premiered'] = date.replace('/', '-')
+            date: str = data['data']['anime']['season_start']
+            field['year'] = date.split('/')[0]
+            field['premiered'] = date.replace('/', '-')
+            field['plot'] = data['data']['anime']['content']
 
-                except (TypeError, AttributeError, KeyError):
-                    # 该sn下没有动画
-                    err_print(self._sn, 'ERROR: 該 sn 下真的有動畫？', status=1)
-                    sys.exit(1)
             # nfo_fields = {'year': '2016', 'thumb': 'https://google.com', 'title': 'asdfsd'},
             data = self.generate_nfo(root_name, field)
             filename = os.path.join(self._bangumi_dir, f'{root_name}.nfo')
