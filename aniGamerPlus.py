@@ -17,6 +17,7 @@ import threading
 import subprocess
 import platform
 import socket
+import pip_system_certs.wrapt_requests
 import requests
 
 import Config
@@ -681,10 +682,10 @@ def __cui(sn, cui_resolution, cui_download_mode, cui_thread_limit, ep_range,
         tasks_counter = 0
         for anime_db in ep_range:
             if anime_db["status"] == 1:
-                if not anime_db["anime_name"] is None \
-                and not anime_db["local_file_path"] is None :
+                if anime_db["anime_name"] is not None \
+                and anime_db["local_file_path"] is not None :
                     a = threading.Thread(target=__get_danmu_only,args=(anime_db["sn"], anime_db["anime_name"], anime_db["local_file_path"]))
-                    a.setDaemon(True)
+                    a.daemon = True
                     thread_tasks.append(a)
                     a.start()
                     tasks_counter = tasks_counter + 1
@@ -770,7 +771,7 @@ def __init_proxy():
 
 
 def do_request(url, headers, cookies, params=None):
-    return requests.get(url, headers=headers, cookies=cookies, params=params)
+    return Config.bahamut_request('GET', url, headers=headers, cookies=cookies, params=params)
 
 
 def parse_anime(soup, animes, headers, cookies):
@@ -789,19 +790,15 @@ def export_my_anime():
 
     url = "https://ani.gamer.com.tw/mygather.php"
     header = {
-        'accept':
-        'application/json',
-        'origin':
-        'https://ani.gamer.com.tw',
-        'authority':
-        'ani.gamer.com.tw',
-        'user-agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36',
+        'accept': 'application/json',
+        'origin': 'https://ani.gamer.com.tw',
+        'referer': 'https://ani.gamer.com.tw/',
+        'User-Agent': settings['ua'],
     }
 
     cookies = Config.read_cookie()
     if not cookies:
-        err_print(0, f"請先設定cookie後再執行此指令", status=1, no_sn=True)
+        err_print(0, "請先設定cookie後再執行此指令", status=1, no_sn=True)
         return
 
     page = 1
@@ -809,7 +806,7 @@ def export_my_anime():
     while True:
         params = {'page': page, 'sort': 0}
         bahamygatherPage = do_request(url, headers=header, cookies=cookies, params=params)
-        if bahamygatherPage.status_code == requests.codes.ok:
+        if bahamygatherPage.status_code == 200:
             soup = BeautifulSoup(bahamygatherPage.text, 'html.parser')
             if not parse_anime(soup, animes, header, cookies):
                 break
