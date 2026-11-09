@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<script src="../static/js/jquery-3.4.0.min.js"></script>
+		<script src="../static/js/popper.min.js"></script>
+		<link rel="stylesheet" href="../static/css/bootstrap.rfs.min.css">
+		<script src="../static/js/bootstrap.min.js"></script>
+		<link rel="stylesheet" href="../static/css/fontawesome.all.min.css" />
+		<link rel="stylesheet" href="../static/css/aniGamerPlus.css" />
+		<meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0" />
+		<link rel="shortcut icon" href="../static/img/aniGamerPlus.ico" type="image/x-icon" />
+		<title>Cookie 管理 - aniGamerPlus</title>
+	</head>
+	<body>
+		<nav class="navbar navbar-expand-md bg-dark navbar-dark fixed-top">
+			<a class="navbar-brand" href="./">aniGamerPlus控制臺</a>
+			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleNavbar">
+				<span class="navbar-toggler-icon"></span>
+			</button>
+			<div class="collapse navbar-collapse" id="collapsibleNavbar">
+				<ul class="navbar-nav">
+					<li class="nav-item my-navbar">
+						<a class="nav-link" href="./">自動模式設定</a>
+					</li>
+					<li class="nav-item my-navbar active">
+						<a class="nav-link" href="#">Cookie 管理</a>
+					</li>
+				</ul>
+			</div>
+		</nav>
+
+		<div class="setting-wrapper mx-auto" style="padding-top: 70px; max-width: 920px;">
+			<div class="row">
+				<h2 class="col">Cookie 狀態</h2>
+			</div>
+			<div class="row setting-content">
+				<div class="input-group">
+					<div class="input-group-prepend">
+						<span class="input-group-text">目前狀態</span>
+					</div>
+					<input id="cookie_status" type="text" class="form-control" readonly />
+					<div class="input-group-append">
+						<button type="button" class="btn btn-secondary" onclick="loadCookieStatus()">重新檢查</button>
+					</div>
+				</div>
+			</div>
+			<div class="row setting-content">
+				<div class="input-group">
+					<div class="input-group-prepend">
+						<span class="input-group-text">詳情</span>
+					</div>
+					<input id="cookie_detail" type="text" class="form-control" readonly />
+				</div>
+			</div>
+
+			<div class="row" style="padding-top: 16px;">
+				<h2 class="col">更新 Cookie</h2>
+			</div>
+			<div class="row setting-content">
+				<p class="col text-muted" style="font-size: 0.9rem;">
+					從瀏覽器 DevTools → Network → 任一請求 → Request Headers → <code>Cookie:</code> 整行複製貼上即可。
+					登入態需要包含 <code>BAHAID</code> 與 <code>BAHARUNE</code>。
+				</p>
+			</div>
+			<div class="row setting-content">
+				<div class="input-group">
+					<div class="input-group-prepend">
+						<span class="input-group-text">Cookie 字串</span>
+					</div>
+					<textarea id="cookie_content" class="form-control" rows="4" placeholder="key=value; key=value; ..."></textarea>
+				</div>
+			</div>
+			<div class="row setting-content">
+				<div class="input-group">
+					<button type="button" class="btn btn-success" onclick="saveCookie()">儲存 Cookie</button>
+					&nbsp;
+					<button type="button" class="btn btn-primary" onclick="restartService()">儲存並重啟</button>
+					&nbsp;
+					<button type="button" class="btn btn-danger" onclick="restartService(true)">僅重啟服務</button>
+				</div>
+			</div>
+
+			<br /><br />
+		</div>
+
+		<!-- 提交結果模態框 -->
+		<div class="modal fade" id="uploadStatus">
+			<div class="modal-dialog modal-sm" role="document">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h4 class="modal-title">提交結果</h4>
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+					</div>
+					<div class="modal-body setting-wrapper">
+						<center>
+							<div id="uploadOk" style="display: none;">
+								<i class="far fa-check-circle fa-4x" style="color: #28A745;"></i>
+								<p class="upload-status" id="uploadOkMsg">操作成功</p>
+							</div>
+							<div id="uploadFailed" style="display: none;">
+								<i class="fas fa-exclamation-circle fa-4x" style="color: #DC3545;"></i>
+								<p class="upload-status" id="uploadFailedMsg">操作失敗</p>
+							</div>
+						</center>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			function showResult(ok, msg) {
+				if (ok) {
+					$('#uploadOkMsg').text(msg || '操作成功');
+					$('#uploadOk').show();
+					$('#uploadFailed').hide();
+				} else {
+					$('#uploadFailedMsg').text(msg || '操作失敗');
+					$('#uploadOk').hide();
+					$('#uploadFailed').show();
+				}
+				$('#uploadStatus').modal();
+			}
+
+			function loadCookieStatus() {
+				$.ajax({
+					url: '/data/cookie',
+					type: 'get',
+					dataType: 'json',
+					success: function(data) {
+						$('#cookie_status').val(data.status);
+						$('#cookie_detail').val(data.detail);
+						$('#cookie_content').val(data.content);
+					},
+					error: function() {
+						showResult(false, '無法取得 cookie 狀態');
+					}
+				});
+			}
+
+			function saveCookie(cb) {
+				var content = $('#cookie_content').val();
+				$.ajax({
+					url: '/uploadCookie',
+					type: 'post',
+					data: content,
+					dataType: 'text',
+					headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+					contentType: 'text/plain; charset=utf-8',
+					success: function() {
+						if (cb) { cb(); } else { showResult(true, 'Cookie 已儲存'); loadCookieStatus(); }
+					},
+					error: function(xhr) {
+						showResult(false, '儲存失敗: ' + (xhr.responseText || ''));
+					}
+				});
+			}
+
+			function restartService(saveFirst) {
+				var doRestart = function() {
+					$.ajax({
+						url: '/restart',
+						type: 'post',
+						dataType: 'text',
+						success: function() {
+							showResult(true, '重啟指令已送出, 約 1 秒後服務將重新啟動, 請稍候重新整理本頁');
+							// 5 秒後嘗試重連
+							setTimeout(function() { location.reload(); }, 6000);
+						},
+						error: function() {
+							showResult(false, '重啟請求失敗 (服務可能正在重啟, 請稍後重整)');
+							setTimeout(function() { location.reload(); }, 6000);
+						}
+					});
+				};
+				if (saveFirst) {
+					saveCookie(doRestart);
+				} else {
+					doRestart();
+				}
+			}
+
+			$(function() { loadCookieStatus(); });
+		</script>
+	</body>
+</html>

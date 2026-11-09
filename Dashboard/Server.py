@@ -213,6 +213,65 @@ def set_sn_list():
     return '{"status":"200"}'
 
 
+@app.route('/cookie', methods=['GET'])
+def cookie_page():
+    return render_template('cookie.html')
+
+
+@app.route('/data/cookie', methods=['GET'])
+def cookie_status():
+    # 回傳目前 cookie.txt 內容與登入狀態預檢結果
+    content = ''
+    try:
+        if os.path.exists(Config.cookie_path):
+            with open(Config.cookie_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+    except Exception as e:
+        content = ''
+    status, detail = Config.check_cookie_valid()
+    return jsonify({'status': status, 'detail': detail, 'content': content})
+
+
+@app.route('/uploadCookie', methods=['POST'])
+def upload_cookie():
+    # 接收使用者貼上的 cookie 字串, 寫入 cookie.txt
+    raw = request.get_data(as_text=True)
+    if not raw or not raw.strip():
+        return '{"status":"400","msg":"cookie 為空"}', 400
+    # 只取第一行, 過濾瀏覽器常見的 "Cookie:" 前綴
+    line = raw.strip().splitlines()[0].strip()
+    line = re.sub(r'^cookie\s*:\s*', '', line, flags=re.IGNORECASE)
+    try:
+        with open(Config.cookie_path, 'w', encoding='utf-8') as f:
+            f.write(line + '\n')
+    except Exception as e:
+        return '{"status":"500","msg":"寫入失敗: %s"}' % str(e), 500
+    # 重置記憶體中的 cookie, 下次讀取會重新解析
+    Config.cookie = None
+    err_print(0, 'Dashboard', '通過 Web 控制臺更新了 cookie.txt', no_sn=True, status=2)
+    return '{"status":"200"}'
+
+
+@app.route('/restart', methods=['POST'])
+def restart_service():
+    # 原地重啟整個 aniGamerPlus 行程, 保留 tmux session 與 PID
+    err_print(0, 'Dashboard', '通過 Web 控制臺觸發重啟', no_sn=True, status=2)
+
+    def do_restart():
+        time.sleep(1.0)  # 等回應送出
+        python = sys.executable
+        # 用絕對路徑指向腳本, 避免依賴 CWD
+        script = os.path.join(Config.get_working_dir(), 'aniGamerPlus.py')
+        argv = [python, '-u', script] + sys.argv[1:]
+        try:
+            os.execv(python, argv)
+        except Exception as e:
+            err_print(0, 'Dashboard', '重啟失敗: %s' % str(e), no_sn=True, status=1)
+
+    threading.Thread(target=do_restart, daemon=True).start()
+    return '{"status":"200"}'
+
+
 def run():
     settings = Config.read_settings()  # 读取配置
 
